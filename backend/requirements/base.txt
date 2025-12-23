@@ -1,0 +1,18 @@
+# Django and core
+Django>=5.0,<6.0
+djangorestframework>=3.14,<4.0
+djangorestframework-simplejwt>=5.3,<6.0
+django-cors-headers>=4.3,<5.0
+
+# Async and WebSockets
+daphne>=4.0,<5.0
+channels>=4.0,<5.0
+
+# Database
+psycopg[binary]>=3.1,<4.0
+
+# Utils
+python-dotenv>=1.0,<2.0
+
+# AI/ML (optional, for learning purposes)
+numpy>=1.26,<2.0
