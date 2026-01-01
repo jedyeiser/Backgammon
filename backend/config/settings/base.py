@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'channels',
+    'drf_spectacular',
 
     # Local apps
     'apps.accounts',
@@ -119,6 +120,22 @@ REST_FRAMEWORK = {
         'anon': '100/hour',
         'user': '1000/hour',
     },
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+# drf-spectacular settings
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Backgammon API',
+    'DESCRIPTION': 'API for online backgammon and board game gameplay with real-time WebSocket support.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': r'/api/',
+    'TAGS': [
+        {'name': 'auth', 'description': 'Authentication and user management'},
+        {'name': 'games', 'description': 'Game creation and gameplay'},
+        {'name': 'invites', 'description': 'Game invitations'},
+    ],
 }
 
 # Simple JWT settings

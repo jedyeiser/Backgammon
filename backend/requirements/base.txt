@@ -4,6 +4,9 @@ djangorestframework>=3.14,<4.0
 djangorestframework-simplejwt>=5.3,<6.0
 django-cors-headers>=4.3,<5.0
 
+# API Documentation
+drf-spectacular>=0.27,<1.0
+
 # Async and WebSockets
 daphne>=4.0,<5.0
 channels>=4.0,<5.0
