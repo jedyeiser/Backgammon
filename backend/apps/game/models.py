@@ -5,11 +5,59 @@ from django.db import models
 from django.utils import timezone
 
 
+class GameType(models.Model):
+    """
+    Represents a type of game supported by the platform.
+
+    Each game type has its own ruleset implementation that handles
+    game-specific logic like board setup, move validation, and win conditions.
+    """
+    code = models.CharField(
+        max_length=50,
+        primary_key=True,
+        help_text="Unique identifier for the game type (e.g., 'backgammon', 'catan')"
+    )
+    name = models.CharField(
+        max_length=100,
+        help_text="Display name for the game type"
+    )
+    description = models.TextField(
+        blank=True,
+        help_text="Description of the game for UI display"
+    )
+    min_players = models.PositiveIntegerField(
+        default=2,
+        help_text="Minimum number of players required"
+    )
+    max_players = models.PositiveIntegerField(
+        default=2,
+        help_text="Maximum number of players allowed"
+    )
+    requires_dice = models.BooleanField(
+        default=False,
+        help_text="Whether this game uses dice"
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this game type is available for play"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'game_types'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
 class Game(models.Model):
     """
-    Represents a backgammon game between two players.
+    Represents a game between players.
 
-    The board state is stored as JSON representing checker positions.
+    Supports multiple game types (backgammon, catan, etc.) through the
+    game_type foreign key. The board state is stored as JSON in a format
+    specific to the game type.
     """
 
     class Status(models.TextChoices):
@@ -27,6 +75,15 @@ class Game(models.Model):
 
     # Identifiers
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Game type
+    game_type = models.ForeignKey(
+        GameType,
+        on_delete=models.PROTECT,
+        related_name='games',
+        default='backgammon',
+        help_text="The type of game being played"
+    )
 
     # Players
     white_player = models.ForeignKey(
@@ -98,6 +155,7 @@ class Game(models.Model):
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['status']),
+            models.Index(fields=['game_type', 'status']),
             models.Index(fields=['white_player', 'status']),
             models.Index(fields=['black_player', 'status']),
         ]
@@ -112,38 +170,32 @@ class Game(models.Model):
         self.version += 1
         super().save(*args, **kwargs)
 
-    @classmethod
-    def get_initial_board(cls) -> dict:
+    def get_initial_board(self) -> dict:
         """
         Return the initial board state for a new game.
 
-        Board representation:
-        - Points 1-24 represent the board positions
-        - Point 0 is white's bar
-        - Point 25 is black's bar
-        - Point 26 is white's home (bearoff)
-        - Point 27 is black's home (bearoff)
-
-        Positive numbers = white checkers
-        Negative numbers = black checkers
+        The state format depends on the game type. Delegates to the
+        appropriate RuleSet implementation.
         """
+        from .rulesets import RuleSetRegistry
+
+        ruleset_class = RuleSetRegistry.get(self.game_type_id)
+        if ruleset_class:
+            ruleset = ruleset_class({})
+            return ruleset.get_initial_state()
+
+        # Fallback for backgammon (legacy support)
         return {
             'points': {
-                '1': 2,     # White starts with 2 on point 1
-                '6': -5,    # Black starts with 5 on point 6
-                '8': -3,    # Black starts with 3 on point 8
-                '12': 5,    # White starts with 5 on point 12
-                '13': -5,   # Black starts with 5 on point 13
-                '17': 3,    # White starts with 3 on point 17
-                '19': 5,    # White starts with 5 on point 19
-                '24': -2,   # Black starts with 2 on point 24
+                '1': 2, '6': -5, '8': -3, '12': 5,
+                '13': -5, '17': 3, '19': 5, '24': -2,
             },
             'bar': {'white': 0, 'black': 0},
             'home': {'white': 0, 'black': 0},
         }
 
     def initialize_board(self) -> None:
-        """Set up the initial board state."""
+        """Set up the initial board state using the game type's ruleset."""
         self.board_state = self.get_initial_board()
         self.save(update_fields=['board_state', 'version'])
 
@@ -268,6 +320,13 @@ class GameInvite(models.Model):
         on_delete=models.CASCADE,
         related_name='received_invites'
     )
+    game_type = models.ForeignKey(
+        GameType,
+        on_delete=models.PROTECT,
+        related_name='invites',
+        default='backgammon',
+        help_text="The type of game being invited to"
+    )
 
     status = models.CharField(
         max_length=20,
@@ -296,6 +355,7 @@ class GameInvite(models.Model):
     def accept(self) -> Game:
         """Accept the invite and create a game."""
         game = Game.objects.create(
+            game_type=self.game_type,
             white_player=self.from_user,
             black_player=self.to_user,
         )
