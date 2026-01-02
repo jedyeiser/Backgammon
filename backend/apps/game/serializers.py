@@ -1,4 +1,14 @@
-"""Serializers for the game app."""
+"""
+Serializers for the game app.
+
+This module contains DRF serializers for:
+- Game list/detail views
+- Move history
+- Game invitations
+- Player information
+
+All serializers are documented for OpenAPI schema generation via drf-spectacular.
+"""
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
@@ -8,7 +18,12 @@ User = get_user_model()
 
 
 class PlayerSerializer(serializers.ModelSerializer):
-    """Minimal player info for game context."""
+    """
+    Minimal player information for game context.
+
+    Used for embedding player data in game responses without
+    exposing full user profile details.
+    """
 
     class Meta:
         model = User
@@ -16,9 +31,14 @@ class PlayerSerializer(serializers.ModelSerializer):
 
 
 class MoveSerializer(serializers.ModelSerializer):
-    """Serializer for game moves."""
+    """
+    Serializer for game moves.
 
-    player = PlayerSerializer(read_only=True)
+    Represents a single action in a game (dice roll, checker move, double, etc.).
+    Used for move history and replay functionality.
+    """
+
+    player = PlayerSerializer(read_only=True, help_text="Player who made this move")
 
     class Meta:
         model = Move
@@ -30,7 +50,12 @@ class MoveSerializer(serializers.ModelSerializer):
 
 
 class GameListSerializer(serializers.ModelSerializer):
-    """Serializer for game list view."""
+    """
+    Serializer for game list view.
+
+    Provides summary information for displaying games in lists.
+    Does not include full board state to minimize payload size.
+    """
 
     white_player = PlayerSerializer(read_only=True)
     black_player = PlayerSerializer(read_only=True)
@@ -46,12 +71,17 @@ class GameListSerializer(serializers.ModelSerializer):
 
 
 class GameDetailSerializer(serializers.ModelSerializer):
-    """Serializer for game detail view with full state."""
+    """
+    Serializer for game detail view with full state.
 
-    white_player = PlayerSerializer(read_only=True)
-    black_player = PlayerSerializer(read_only=True)
-    winner = PlayerSerializer(read_only=True)
-    moves = MoveSerializer(many=True, read_only=True)
+    Includes complete board state, dice values, doubling cube state,
+    and full move history. Used for the game play interface.
+    """
+
+    white_player = PlayerSerializer(read_only=True, help_text="Player controlling white checkers")
+    black_player = PlayerSerializer(read_only=True, help_text="Player controlling black checkers")
+    winner = PlayerSerializer(read_only=True, help_text="Winner of the game (null if ongoing)")
+    moves = MoveSerializer(many=True, read_only=True, help_text="Complete move history")
 
     class Meta:
         model = Game
@@ -106,18 +136,31 @@ class GameJoinSerializer(serializers.Serializer):
 
 
 class MakeMoveSerializer(serializers.Serializer):
-    """Serializer for making a move."""
+    """
+    Serializer for making a move.
 
-    move_type = serializers.ChoiceField(choices=Move.MoveType.choices)
+    Handles validation for all move types including dice rolls,
+    checker movements, doubling, and resignation. Uses optimistic
+    locking via version field to prevent race conditions.
+    """
+
+    move_type = serializers.ChoiceField(
+        choices=Move.MoveType.choices,
+        help_text="Type of move: roll, move, double, accept_double, reject_double, resign"
+    )
     checker_moves = serializers.ListField(
         child=serializers.ListField(
             child=serializers.IntegerField(),
             min_length=2,
             max_length=2
         ),
-        required=False
+        required=False,
+        help_text="List of [from_point, to_point] pairs for checker moves"
     )
-    version = serializers.IntegerField(required=True)
+    version = serializers.IntegerField(
+        required=True,
+        help_text="Game version for optimistic locking (prevents race conditions)"
+    )
 
     def validate(self, attrs):
         """Validate the move is legal."""

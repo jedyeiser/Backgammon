@@ -1,5 +1,76 @@
 """
 WebSocket consumers for real-time game updates.
+
+This module implements Django Channels WebSocket consumers for real-time
+game communication. It supports both game-specific communication and
+lobby-wide notifications.
+
+WebSocket Protocol (GameConsumer):
+==================================
+
+Connection URL: ws://<host>/ws/game/<game_id>/
+
+Client -> Server Messages:
+--------------------------
+1. Roll dice:
+   {"type": "roll_dice"}
+
+2. Make moves:
+   {"type": "make_move", "moves": [[from, to], ...], "version": <int>}
+
+3. Offer double:
+   {"type": "offer_double"}
+
+4. Respond to double:
+   {"type": "respond_double", "accept": true|false}
+
+5. Resign:
+   {"type": "resign"}
+
+6. Chat:
+   {"type": "chat", "message": "<text>"}
+
+Server -> Client Messages:
+--------------------------
+1. Game state (on connect):
+   {"type": "game_state", "data": <GameDetailSerializer>}
+
+2. Game update:
+   {"type": "game_update", "event": "<event_name>", "data": {...}, "game": <GameDetailSerializer>}
+   Events: dice_rolled, move_made, double_offered, double_accepted, double_rejected, player_resigned
+
+3. Chat message:
+   {"type": "chat", "username": "<user>", "message": "<text>"}
+
+4. Error:
+   {"type": "error", "message": "<error_text>"}
+
+Close Codes:
+------------
+- 4001: Unauthorized (anonymous user)
+- 4004: Game not found
+
+
+WebSocket Protocol (LobbyConsumer):
+===================================
+
+Connection URL: ws://<host>/ws/lobby/
+
+Client -> Server Messages:
+--------------------------
+1. Send invite:
+   {"type": "invite", "to_user_id": "<uuid>"}
+
+Server -> Client Messages:
+--------------------------
+1. User status:
+   {"type": "user_status", "user_id": "<uuid>", "username": "<user>", "status": "online"|"offline"}
+
+2. Game invite:
+   {"type": "game_invite", "from_user_id": "<uuid>", "from_username": "<user>"}
+
+3. New game available:
+   {"type": "new_game", "game": <GameListSerializer>}
 """
 import json
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
@@ -15,11 +86,19 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
     """
     WebSocket consumer for real-time game communication.
 
-    Handles:
-    - Game state updates
-    - Move notifications
-    - Chat messages
-    - Spectator mode
+    Provides bidirectional communication for:
+    - Game state synchronization
+    - Move execution and validation
+    - Doubling cube interactions
+    - In-game chat
+    - Spectator mode support
+
+    Attributes:
+        game_id: UUID of the connected game
+        game_group_name: Channel layer group name for this game
+        user: Authenticated user
+        is_player: Whether user is a player (vs spectator)
+        player_color: 'white' or 'black' if player, None if spectator
     """
 
     async def connect(self):
