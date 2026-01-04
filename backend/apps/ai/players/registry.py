@@ -186,9 +186,11 @@ def _register_builtin_players() -> None:
     """Register the built-in player types."""
     from .random_player import RandomPlayer
     from .heuristic import HeuristicPlayer
+    from .neural import NeuralPlayer
 
     PlayerRegistry.register('random', RandomPlayer)
     PlayerRegistry.register('heuristic', HeuristicPlayer)
+    PlayerRegistry.register('neural', NeuralPlayer)
 
 
 # Auto-register on module import
