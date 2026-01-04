@@ -249,8 +249,8 @@ class TestNetworkBuilder:
         network = builder.from_json(minimal_architecture)
         info = builder.get_layer_info(network)
 
-        assert len(info) == 2  # 2 layers in minimal architecture
-        assert info[0]['id'] == 'output'
+        assert len(info) == 4  # 4 layers in minimal architecture (fc1, act1, fc2, output)
+        assert info[0]['id'] == 'fc1'
         assert info[0]['type'] == 'Linear'
 
 
@@ -405,6 +405,7 @@ class TestArchitectures:
 
         for arch in architectures:
             network = builder.from_json(arch)
+            network.eval()  # BatchNorm requires batch_size > 1 in training mode
             x = torch.randn(1, arch['input_size'])
             output = network(x)
             assert output.shape[1] == arch['output_size']

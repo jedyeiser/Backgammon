@@ -53,7 +53,9 @@ class DynamicNetwork(nn.Module):
 
     def get_layer(self, layer_id: str) -> Optional[nn.Module]:
         """Get a layer by its ID."""
-        return self._layers.get(layer_id)
+        if layer_id in self._layers:
+            return self._layers[layer_id]
+        return None
 
     def layer_ids(self) -> List[str]:
         """Return list of layer IDs in order."""

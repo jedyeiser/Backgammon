@@ -172,10 +172,17 @@ class TestNeuralPlayer:
     @pytest.fixture
     def player(self, minimal_architecture):
         """Create a neural player with minimal network."""
+        from apps.ai.networks.builder import NetworkBuilder
+        from apps.ai.encoders.backgammon import BackgammonEncoder
+
+        builder = NetworkBuilder()
+        network = builder.from_json(minimal_architecture)
+
         return NeuralPlayer(
             player_id='neural_1',
             game_type='backgammon',
-            architecture=minimal_architecture,
+            network=network,
+            encoder=BackgammonEncoder(),
         )
 
     def test_init(self, player):
@@ -202,10 +209,17 @@ class TestNeuralPlayer:
 
     def test_greedy_selection(self, sample_backgammon_state, minimal_architecture):
         """Test greedy selection with temperature=0."""
+        from apps.ai.networks.builder import NetworkBuilder
+        from apps.ai.encoders.backgammon import BackgammonEncoder
+
+        builder = NetworkBuilder()
+        network = builder.from_json(minimal_architecture)
+
         player = NeuralPlayer(
             player_id='greedy',
             game_type='backgammon',
-            architecture=minimal_architecture,
+            network=network,
+            encoder=BackgammonEncoder(),
             temperature=0.0,
         )
 
