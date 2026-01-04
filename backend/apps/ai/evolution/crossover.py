@@ -252,7 +252,7 @@ class ArchitectureCrossover:
         Combine two architectures.
 
         Strategy: Use dominant structure, but randomly inherit
-        layer sizes from recessive parent.
+        layer sizes from recessive parent (except for output layer).
         """
         result = copy.deepcopy(dominant)
 
@@ -262,8 +262,15 @@ class ArchitectureCrossover:
         # Find matching layer types and randomly inherit sizes
         rec_linears = [l for l in rec_layers if l.get('type') == 'linear']
 
-        for layer in dom_layers:
+        # Find the last linear layer (output layer) - we should not modify its output size
+        linear_indices = [i for i, l in enumerate(dom_layers) if l.get('type') == 'linear']
+        last_linear_idx = linear_indices[-1] if linear_indices else -1
+
+        for i, layer in enumerate(dom_layers):
             if layer.get('type') == 'linear' and rec_linears:
+                # Skip the output layer - don't change its output size
+                if i == last_linear_idx:
+                    continue
                 # 30% chance to inherit size from recessive
                 if random.random() < 0.3:
                     rec_layer = random.choice(rec_linears)
