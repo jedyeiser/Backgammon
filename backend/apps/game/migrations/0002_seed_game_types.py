@@ -25,7 +25,7 @@ def seed_game_types(apps, schema_editor):
             'min_players': 3,
             'max_players': 4,
             'requires_dice': True,
-            'is_active': False,  # Placeholder implementation
+            'is_active': True,
         },
     ]
 
