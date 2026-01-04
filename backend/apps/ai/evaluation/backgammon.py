@@ -359,3 +359,166 @@ def _direct_hit_probability(distance: int) -> float:
         24: 0.028,  # 1/36 (6-6)
     }
     return hit_probs.get(distance, 0.0)
+
+
+def generate_all_moves(
+    game_state: Dict[str, Any],
+    player: str,
+) -> List[Dict[str, Any]]:
+    """
+    Generate all legal moves for a player given the current state.
+
+    This generates individual moves (single checker movements), not
+    complete turn sequences. For training, we process moves one at a time.
+
+    Args:
+        game_state: Current backgammon state with points, bar, dice, etc.
+        player: 'white' or 'black'.
+
+    Returns:
+        List of legal move dictionaries with 'from', 'to', 'die_used'.
+    """
+    points = game_state.get('points', {})
+    bar = game_state.get('bar', {'white': 0, 'black': 0})
+    home = game_state.get('home', {'white': 0, 'black': 0})
+    moves_remaining = game_state.get('moves_remaining', [])
+
+    if not moves_remaining:
+        return []
+
+    legal_moves = []
+    is_white = player == 'white'
+    sign = 1 if is_white else -1
+
+    # Get unique dice values to avoid duplicate move generation
+    unique_dice = set(moves_remaining)
+
+    # If player has checkers on the bar, must move them first
+    player_bar = bar.get(player, 0)
+
+    if player_bar > 0:
+        # Must enter from bar
+        for die in unique_dice:
+            if is_white:
+                # White enters on opponent's home board (points 1-6)
+                to_point = die  # Die roll of 1 enters on point 1, etc.
+                from_point = 0  # Bar
+            else:
+                # Black enters on opponent's home board (points 19-24)
+                to_point = 25 - die  # Die roll of 1 enters on point 24
+                from_point = 25  # Bar
+
+            # Check if landing point is valid
+            if _can_land(points, to_point, is_white):
+                legal_moves.append({
+                    'type': 'move',
+                    'from': from_point,
+                    'to': to_point,
+                    'die_used': die,
+                })
+
+        return legal_moves
+
+    # Check if player can bear off
+    can_bear_off = _can_bear_off(game_state, player)
+
+    # Generate moves from each point
+    for point in range(1, 25):
+        point_count = points.get(str(point), 0)
+
+        # Check if player has checkers on this point
+        if is_white and point_count <= 0:
+            continue
+        if not is_white and point_count >= 0:
+            continue
+
+        for die in unique_dice:
+            if is_white:
+                to_point = point + die
+            else:
+                to_point = point - die
+
+            # Bearing off
+            if is_white and to_point > 24:
+                if can_bear_off:
+                    # Can bear off if exact or highest point
+                    if to_point == 25 or _is_highest_point(points, point, is_white):
+                        legal_moves.append({
+                            'type': 'move',
+                            'from': point,
+                            'to': 26,  # White bear off
+                            'die_used': die,
+                        })
+            elif not is_white and to_point < 1:
+                if can_bear_off:
+                    if to_point == 0 or _is_highest_point(points, point, is_white):
+                        legal_moves.append({
+                            'type': 'move',
+                            'from': point,
+                            'to': 27,  # Black bear off
+                            'die_used': die,
+                        })
+            elif 1 <= to_point <= 24:
+                # Regular move
+                if _can_land(points, to_point, is_white):
+                    legal_moves.append({
+                        'type': 'move',
+                        'from': point,
+                        'to': to_point,
+                        'die_used': die,
+                    })
+
+    return legal_moves
+
+
+def _can_land(points: Dict[str, int], point: int, is_white: bool) -> bool:
+    """Check if a player can land on a point."""
+    count = points.get(str(point), 0)
+
+    if is_white:
+        # White can land if empty, has white checkers, or single black (hit)
+        return count >= -1
+    else:
+        # Black can land if empty, has black checkers, or single white (hit)
+        return count <= 1
+
+
+def _can_bear_off(game_state: Dict[str, Any], player: str) -> bool:
+    """Check if a player can bear off (all checkers in home board)."""
+    points = game_state.get('points', {})
+    bar = game_state.get('bar', {'white': 0, 'black': 0})
+
+    # Cannot bear off if any checker on bar
+    if bar.get(player, 0) > 0:
+        return False
+
+    is_white = player == 'white'
+
+    for point in range(1, 25):
+        count = points.get(str(point), 0)
+
+        if is_white and count > 0:
+            # White checker not in home board (19-24)
+            if point < 19:
+                return False
+        elif not is_white and count < 0:
+            # Black checker not in home board (1-6)
+            if point > 6:
+                return False
+
+    return True
+
+
+def _is_highest_point(points: Dict[str, int], point: int, is_white: bool) -> bool:
+    """Check if this is the highest occupied point for bearing off."""
+    if is_white:
+        # Check if any white checkers on higher points
+        for p in range(point + 1, 25):
+            if points.get(str(p), 0) > 0:
+                return False
+    else:
+        # Check if any black checkers on lower points
+        for p in range(1, point):
+            if points.get(str(p), 0) < 0:
+                return False
+    return True
