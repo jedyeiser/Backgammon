@@ -187,10 +187,12 @@ def _register_builtin_players() -> None:
     from .random_player import RandomPlayer
     from .heuristic import HeuristicPlayer
     from .neural import NeuralPlayer
+    from .behavioral import BehavioralPlayer
 
     PlayerRegistry.register('random', RandomPlayer)
     PlayerRegistry.register('heuristic', HeuristicPlayer)
     PlayerRegistry.register('neural', NeuralPlayer)
+    PlayerRegistry.register('behavioral', BehavioralPlayer)
 
 
 # Auto-register on module import
